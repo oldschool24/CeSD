@@ -33,9 +33,9 @@ class RMS(object):
 
 class APTArgs:
     def __init__(self,knn_k=16,knn_avg=True, rms=True,knn_clip=0.0005,):
-        self.knn_k = knn_k 
-        self.knn_avg = knn_avg 
-        self.rms = rms 
+        self.knn_k = knn_k
+        self.knn_avg = knn_avg
+        self.rms = rms
         self.knn_clip = knn_clip
 
 rms = RMS()
@@ -45,27 +45,27 @@ class CIC(nn.Module):
     def __init__(self, obs_dim, skill_dim, hidden_dim, project_skill):
         super().__init__()
         self.obs_dim = obs_dim
-        self.skill_dim = skill_dim      
+        self.skill_dim = skill_dim
 
-        self.state_net = nn.Sequential(nn.Linear(self.obs_dim, hidden_dim), nn.ReLU(), 
-                                        nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), 
+        self.state_net = nn.Sequential(nn.Linear(self.obs_dim, hidden_dim), nn.ReLU(),
+                                        nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
                                         nn.Linear(hidden_dim, self.skill_dim))
 
-        self.next_state_net = nn.Sequential(nn.Linear(self.obs_dim, hidden_dim), nn.ReLU(), 
-                                        nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), 
+        self.next_state_net = nn.Sequential(nn.Linear(self.obs_dim, hidden_dim), nn.ReLU(),
+                                        nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
                                         nn.Linear(hidden_dim, self.skill_dim))
 
-        self.pred_net = nn.Sequential(nn.Linear(2 * self.skill_dim, hidden_dim), nn.ReLU(), 
-                                        nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), 
+        self.pred_net = nn.Sequential(nn.Linear(2 * self.skill_dim, hidden_dim), nn.ReLU(),
+                                        nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
                                         nn.Linear(hidden_dim, self.skill_dim))
 
         if project_skill:
             self.skill_net = nn.Sequential(nn.Linear(self.skill_dim, hidden_dim), nn.ReLU(),
-                                            nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), 
+                                            nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
                                             nn.Linear(hidden_dim, self.skill_dim))
         else:
             self.skill_net = nn.Identity()
-   
+
         self.apply(utils.weight_init)
 
     def forward(self,state,next_state,skill):
@@ -79,7 +79,7 @@ class CIC(nn.Module):
 
 def compute_apt_reward(source, target, args):
     b1, b2 = source.size(0), target.size(0)
-    # (b1, 1, c) - (1, b2, c) -> (b1, 1, c) - (1, b2, c) -> (b1, b2, c) -> (b1, b2)
+    # (b1, 1, c) - (1, b2, c) -> (b1, b2, c) -> (b1, b2)
     sim_matrix = torch.norm(source[:, None, :].view(b1, 1, -1) - target[None, :, :].view(1, b2, -1), dim=-1, p=2)
     reward, _ = sim_matrix.topk(args.knn_k, dim=1, largest=False, sorted=True)  # (b1, k)
 
@@ -114,7 +114,7 @@ class Proto(nn.Module):
         self.protos = nn.Linear(num_protos, num_protos, bias=False)
         self.apply(utils.weight_init)
 
-    def forward(self, s, t):                 
+    def forward(self, s, t):
         # normalize prototypes. s.shape=(1024, 24), t.shape=(1024, 24)
         C = self.protos.weight.data.clone()
         C = F.normalize(C, dim=1, p=2)
@@ -167,7 +167,7 @@ class Proto(nn.Module):
         matrix = np.zeros((self.num_protos, int(self.batch_size)))
         for i in range(self.num_protos):
             matrix[i][cluster_index[i]] = 1
-        return torch.from_numpy(matrix).unsqueeze(-1)     
+        return torch.from_numpy(matrix).unsqueeze(-1)
 
     def sinkhorn(self, scores):
         def remove_infs(x):
@@ -221,10 +221,10 @@ class CeSDAgent(EnsembleDDPGAgent):
         # Optimizers
         self.cic_optimizer = torch.optim.Adam(self.cic.parameters(), lr=self.lr)
         self.cic.train()
-        
+
         # Proto
         self.proto = Proto(obs_dim=self.obs_dim, T=proto_T, num_protos=ensemble_size, batch_size=self.batch_size,
-                num_iters=self.proto_num_iters, net=self.cic.state_net).cuda()
+                num_iters=self.proto_num_iters, net=self.cic.state_net).to(kwargs['device'])
         self.proto_optimizer = torch.optim.Adam(self.proto.parameters(), lr=self.lr)
 
     def get_meta_specs(self):
@@ -251,7 +251,7 @@ class CeSDAgent(EnsembleDDPGAgent):
         query = F.normalize(query, dim=1)
         key = F.normalize(key, dim=1)
         cov = torch.mm(query,key.T) # (b,b)
-        sim = torch.exp(cov / temperature) 
+        sim = torch.exp(cov / temperature)
         neg = sim.sum(dim=-1) # (b,)
         row_sub = torch.Tensor(neg.shape).fill_(math.e**(1 / temperature)).to(neg.device)
         neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
@@ -278,7 +278,7 @@ class CeSDAgent(EnsembleDDPGAgent):
     def compute_intr_reward(self, obs, skill, next_obs, step):
         with torch.no_grad():
             loss, logits = self.compute_cpc_loss(obs, next_obs, skill)
-      
+
         reward = loss
         reward = reward.clone().detach().unsqueeze(-1)
 
@@ -315,13 +315,13 @@ class CeSDAgent(EnsembleDDPGAgent):
             next_obs = self.aug_and_encode(next_obs)
 
         mask = None
-        if self.reward_free:
+        if self.reward_free:  # then phase_1: use only intr reward
             if self.update_rep:
                 metrics.update(self.update_cic(obs, skill, next_obs, step))
 
             # Cluster. Calculate Reward for Each Cluster
             intr_reward = torch.zeros(obs.shape[0]).to(self.device)
-            cluster_samples, cluster_index = self.proto.calculate_cluster(next_obs)
+            cluster_samples, cluster_index = self.proto.calculate_cluster(next_obs)  # get S_i^clu
             count_of_big_cluster = 0
             for i in range(self.ensemble_size):
                 next_obs_cluster = cluster_samples[i]              # (number of samples, obs_dim)
@@ -330,7 +330,7 @@ class CeSDAgent(EnsembleDDPGAgent):
                     skill_cluster = skill.argmax(-1)[cluster_index[i]]       # (c_size, 1)
                     countB = torch.sum(skill_cluster != i)                   # calculate the intrinsic reward for policy constraints
                     intrinsicB = 1. / (1. + countB)
-
+                    # TODO: error in next line? next_obs_cluster, next_obs_cluster
                     intr_reward_cluster = self.compute_apt_reward(next_obs_cluster, next_obs_cluster).squeeze()
                     # print("intr_reward_cluster:", intr_reward_cluster.shape)
                     intr_reward[cluster_index[i]] = intr_reward_cluster + intrinsicB * self.constrain_factor
@@ -359,7 +359,7 @@ class CeSDAgent(EnsembleDDPGAgent):
         # TODO: update proto
         if self.reward_free:
             metrics.update(self.update_proto(obs, next_obs, step))
-        
+
         # update critic target
         utils.soft_update_params(self.critic, self.critic_target,
                                  self.critic_target_tau)

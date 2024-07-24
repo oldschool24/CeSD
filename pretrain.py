@@ -1,7 +1,7 @@
 import warnings
 import random
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-import time 
+import time
 import os
 
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
@@ -24,7 +24,7 @@ from video import TrainVideoRecorder, VideoRecorder
 torch.backends.cudnn.benchmark = True
 
 from dmc_benchmark import PRIMAL_TASKS
-import wandb 
+import wandb
 
 
 def make_agent(obs_type, obs_spec, action_spec, num_expl_steps, cfg):
@@ -41,10 +41,10 @@ class Workspace:
         print(f'workspace: {self.work_dir}')
 
         self.cfg = cfg
-        
+
         # random seeds
         cfg.seed = random.randint(0, 100000)
-        
+
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
 
@@ -235,7 +235,7 @@ class Workspace:
             torch.save(payload, f)
 
 
-@hydra.main(config_path='.', config_name='pretrain')
+@hydra.main(version_base=None, config_path='.', config_name='pretrain')
 def main(cfg):
     from pretrain import Workspace as W
     root_dir = Path.cwd()
@@ -250,7 +250,6 @@ def main(cfg):
 
 if __name__ == '__main__':
     main()
-
 
 # python pretrain.py agent=cesd domain=walker
 # python pretrain.py agent=cesd domain=quadruped

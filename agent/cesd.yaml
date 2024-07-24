@@ -25,10 +25,10 @@ batch_size: 1024
 project_skill: true
 init_critic: true
 rew_type: og
-update_rep: true 
+update_rep: true
 temp: 0.5
 update_encoder: False
 
-proto_T: 0.1        
-proto_num_iters: {"walker": 6, "quadruped": 5, "jaco": 4} 
+proto_T: 0.1
+proto_num_iters: {"walker": 6, "quadruped": 5, "jaco": 4}
 constrain_factor: {"walker": 1.0, "quadruped": 1.0, "jaco": 0.1}

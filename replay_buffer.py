@@ -141,7 +141,7 @@ class ReplayBuffer(IterableDataset):
             if not self._store_episode(eps_fn):
                 break
 
-    def _sample(self): 
+    def _sample(self):
         try:
             self._try_fetch()
         except:
